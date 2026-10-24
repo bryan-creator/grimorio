@@ -143,7 +143,7 @@ button.gl{all:unset;cursor:help;border-bottom:1px dotted var(--ac)}button.gl:foc
 <details class="fg"><summary>Características</summary><div class="chips" id="ff"></div></details>
 <button class="clear" id="clr">Limpar filtros</button>
 </aside>
-<main><div class="vt" id="vt"><button type="button" data-v="card" aria-pressed="true">▦ Cartões</button><button type="button" data-v="list" aria-pressed="false">☰ Lista compacta</button></div><p id="count" aria-live="polite"></p><div id="out"></div></main>
+<main><div class="vt" id="vt"><button type="button" id="dmine" aria-pressed="false">★ Meu Grimório (0)</button><button type="button" data-v="card" aria-pressed="true">▦ Cartões</button><button type="button" data-v="list" aria-pressed="false">☰ Lista compacta</button></div><p id="count" aria-live="polite"></p><div id="out"></div></main>
 </div>
 <section class="guide" id="p2" hidden><div>
 <h2>Como a magia funciona</h2>
@@ -1686,19 +1686,27 @@ S.forEach(s=>{if(!s.te)s.te=s.sv.size?'Salvaguarda de '+[...s.sv].join(' ou '):/
 
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const MY=new Set(LS.get('grimorio:mine',[]));
+function saveMine(){LS.set('grimorio:mine',[...MY]);if(MYDOC)MYDOC.set({list:[...MY],t:Date.now()}).catch(()=>{})}
+let MYDOC=null;
+(async()=>{try{if(!window.claude||!claude.use)return;const[db,user]=await Promise.all([claude.use('db'),claude.use('user')]);if(!db||!user)return;const id=await user.id();if(!id)return;
+ MYDOC=db.collection('data/users/'+id).doc('mine');const sn=await MYDOC.get();
+ if(sn.exists&&Array.isArray((sn.data()||{}).list)){MY.clear();sn.data().list.forEach(k=>MY.add(k));LS.set('grimorio:mine',[...MY])}else if(MY.size)MYDOC.set({list:[...MY],t:Date.now()}).catch(()=>{});
+ draw()}catch(e){}})();
+
 function dif(s){const t=s.te||'',p=[],m=t.match(/[Ss]alvaguarda de (Força|Destreza|Constituição|Inteligência|Sabedoria|Carisma)/);
  if(/^Ataque|ataque de magia/i.test(t))p.push('<b>Você rola:</b> ataque de magia (d20 + proficiência + modificador do atributo de conjuração) contra a CA do alvo. 20 natural é crítico; 1 natural erra.');
  if(m||/^Salvaguarda/.test(t)){const u=t.replace(/\s*\(.*/,''),a=/^Salvaguarda de [^(]*? ou /.test(t)?u.charAt(0).toLowerCase()+u.slice(1):'salvaguarda de '+(m?m[1]:'');p.push(`<b>O alvo rola:</b> ${a} contra a sua CD de magia (8 + proficiência + modificador do atributo de conjuração).`)}
  else if(t&&!/^Sem teste|^Ataque/.test(t))p.push(`<b>Teste:</b> ${t}.`);
  if(s.c)p.push('<b>Concentração:</b> ao sofrer dano, salvaguarda de Constituição com CD 10 ou metade do dano (o que for maior).');
  return p.length?`<div class="dif">${p.join('<br>')}</div>`:''}
-document.addEventListener('click',e=>{const b=e.target.closest('.star');if(!b)return;const k=b.dataset.k;MY.has(k)?MY.delete(k):MY.add(k);LS.set('grimorio:mine',[...MY]);
+document.addEventListener('click',e=>{const b=e.target.closest('.star');if(!b)return;const k=b.dataset.k;MY.has(k)?MY.delete(k):MY.add(k);saveMine();
  if(st.mine)draw();else{const on=MY.has(k);b.setAttribute('aria-pressed',on);b.textContent=on?'★':'☆';upd()}});
 function upd(){const n=(st.q.trim()?1:0)+(st.lv!==null?1:0)+['sc','cl','at','tc','ar','ae','cp','du','tm','dg','sv','sr','fn','ra','te'].reduce((a,k)=>a+st[k].size,0)+(st.c?1:0)+(st.r?1:0)+(st.v?1:0)+(st.mine?1:0);
  $('mclr').textContent='Limpar filtros'+(n?' ('+n+')':'');$('mclr').classList.toggle('off',!n);
- $('mmine').textContent='★ Meu grimório ('+MY.size+')';$('mmine').setAttribute('aria-pressed',st.mine)}
+ $('mmine').textContent='★ Meu grimório ('+MY.size+')';$('mmine').setAttribute('aria-pressed',st.mine);const dm=$('dmine');if(dm){dm.textContent='★ Meu Grimório ('+MY.size+')';dm.setAttribute('aria-pressed',st.mine)}}
 $('mclr').onclick=()=>$('clr').click();
 $('mmine').onclick=()=>{st.mine=!st.mine;draw()};
+$('dmine').onclick=()=>{st.mine=!st.mine;draw()};
 $('mfl').onclick=()=>{const o=document.querySelector('aside').classList.toggle('open');$('mfl').setAttribute('aria-expanded',o);$('mfl').textContent=o?'Filtros ▴':'Filtros ▾'};
 if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 
